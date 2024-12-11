@@ -1,0 +1,88 @@
+version: '3.9'
+
+services:
+  postgres-inventory:
+    image: postgres
+    container_name: postgres-inventory
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: inventory-service
+    ports:
+      - "5434:5432"
+    volumes:
+      - ./local-docker-file/data/inventory:/var/lib/postgresql/data
+      - ./local-docker-file/postgres/init/inventory/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - app-network
+
+  postgres-order:
+    image: postgres
+    container_name: postgres-order
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: order-service
+    ports:
+      - "5435:5432"
+    volumes:
+      - ./local-docker-file/data/order:/var/lib/postgresql/data
+      - ./local-docker-file/postgres/init/order/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - app-network
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: user@domain.ca
+      PGADMIN_DEFAULT_PASSWORD: password
+    ports:
+      - "8881:80"
+    depends_on:
+      - postgres-inventory
+      - postgres-order
+    networks:
+      - app-network
+
+  inventory-service:
+    build:
+      context: ../../inventory-service
+      dockerfile: Dockerfile
+    container_name: inventory-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-inventory:5432/inventory-service
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    ports:
+      - "8082:8082"
+    depends_on:
+      - postgres-inventory
+    networks:
+      - app-network
+
+  order-service:
+    build:
+      context: ../../order-service
+      dockerfile: Dockerfile
+    container_name: order-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-order:5432/order-service
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_FLYWAY_ENABLED: false
+      ORDER_SERVICE_URL: http://order-service:8085
+    ports:
+      - "8085:8085"
+    depends_on:
+      - postgres-order
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

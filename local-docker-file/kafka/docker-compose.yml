@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - kafka-network
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - kafka-network
+
+  notification-service:
+    build:
+      context: ../../notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    depends_on:
+      - kafka
+    ports:
+      - "8089:8090" # Updated to map external port 8089 to internal port 8090
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_MAIL_HOST: sandbox.smtp.mailtrap.io
+      SPRING_MAIL_PORT: 2525
+      SPRING_MAIL_USERNAME: a128e2f67c56d9
+      SPRING_MAIL_PASSWORD: 25fc9175a22f2e
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+      SERVER_PORT: 8090
+    networks:
+      - kafka-network
+
+networks:
+  kafka-network:
+    driver: bridge
